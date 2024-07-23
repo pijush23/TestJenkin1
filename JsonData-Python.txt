@@ -1,0 +1,134 @@
+[
+    {
+        "name": "John",
+        "age": 30,
+        "city": "New York",
+        "skills": ["Python", "SQL"]
+    },
+    {
+        "name": "Anna",
+        "age": 22,
+        "city": "London",
+        "skills": ["Excel", "PowerPoint"]
+    },
+    {
+        "name": "Mike",
+        "age": 32,
+        "city": "Chicago",
+        "skills": ["Java", "C++"]
+    }
+]
+
+
+Steps to Handle Nested Arrays:
+Normalize the JSON structure.
+Flatten the nested arrays.
+Convert to DataFrame.
+Insert the DataFrame into SQL Server.
+
+
+import pandas as pd
+import json
+
+# JSON data
+json_data = '''
+[
+    {
+        "name": "John",
+        "age": 30,
+        "city": "New York",
+        "skills": ["Python", "SQL"]
+    },
+    {
+        "name": "Anna",
+        "age": 22,
+        "city": "London",
+        "skills": ["Excel", "PowerPoint"]
+    },
+    {
+        "name": "Mike",
+        "age": 32,
+        "city": "Chicago",
+        "skills": ["Java", "C++"]
+    }
+]
+'''
+
+# Load JSON data
+data = json.loads(json_data)
+
+# Normalize the JSON data
+df = pd.json_normalize(data, 'skills', ['name', 'age', 'city'], record_prefix='skill_')
+
+print(df)
+
+
+  skill_0    name  age     city
+0  Python    John   30  New York
+1     SQL    John   30  New York
+2   Excel    Anna   22   London
+3 PowerPoint  Anna   22   London
+4    Java    Mike   32  Chicago
+5     C++    Mike   32  Chicago
+
+
+import pyodbc
+
+# Database connection parameters
+server = 'your_server'
+database = 'your_database'
+username = 'your_username'
+password = 'your_password'
+
+# Connection string
+conn_str = (
+    'DRIVER={ODBC Driver 17 for SQL Server};'
+    f'SERVER={server};'
+    f'DATABASE={database};'
+    f'UID={username};'
+    f'PWD={password}'
+)
+
+# Connect to the database
+conn = pyodbc.connect(conn_str)
+
+# Insert DataFrame into SQL Server
+table_name = 'your_table'
+cursor = conn.cursor()
+
+# Create insert query dynamically based on DataFrame columns
+columns = ', '.join(df.columns)
+placeholders = ', '.join(['?'] * len(df.columns))
+insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+
+for row in df.itertuples(index=False, name=None):
+    cursor.execute(insert_query, row)
+
+# Commit the transaction
+conn.commit()
+
+# Close the connection
+cursor.close()
+conn.close()
+
+
+
+from sqlalchemy import create_engine
+
+# Database connection URL
+conn_url = f'mssql+pyodbc://{username}:{password}@{server}/{database}?driver=ODBC+Driver+17+for+SQL+Server'
+
+# Create an engine
+engine = create_engine(conn_url)
+
+# Insert DataFrame into SQL Server
+table_name = 'your_table'
+df.to_sql(table_name, engine, if_exists='append', index=False)
+
+
+
+Notes:
+The json_normalize function is flexible and allows you to flatten complex JSON structures by specifying the nested path.
+Adjust the connection parameters (server, database, username, password) and table name (your_table) as per your environment.
+Ensure the SQL Server table schema matches the DataFrame structure.
+This approach will help you handle nested JSON data and insert it into SQL Server efficiently.
