@@ -1,0 +1,100 @@
+import pyodbc
+import pandas as pd
+import json
+
+class SQLServerDatabase:
+    def __init__(self, server, database, username, password):
+        self.server = server
+        self.database = database
+        self.username = username
+        self.password = password
+        self.connection = None
+    
+    def connect(self):
+        try:
+            self.connection = pyodbc.connect(
+                f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={self.server};DATABASE={self.database};UID={self.username};PWD={self.password}'
+            )
+            print("Connection successful")
+        except Exception as e:
+            print(f"Error connecting to database: {e}")
+    
+    def execute_query(self, query, params=None):
+        cursor = self.connection.cursor()
+        try:
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            self.connection.commit()
+            print("Query executed successfully")
+        except Exception as e:
+            print(f"Error executing query: {e}")
+    
+    def fetch_data(self, query, params=None):
+        cursor = self.connection.cursor()
+        try:
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            results = cursor.fetchall()
+            columns = [column[0] for column in cursor.description]
+            data = [dict(zip(columns, row)) for row in results]
+            return data
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+            return None
+    
+    def json_to_dataframe(self, json_data):
+        try:
+            data_dict = json.loads(json_data)
+            df = pd.DataFrame(data_dict)
+            return df
+        except Exception as e:
+            print(f"Error converting JSON to DataFrame: {e}")
+            return None
+
+    def dataframe_to_sql(self, df, table_name):
+        cursor = self.connection.cursor()
+        columns = ",".join(df.columns)
+        placeholders = ",".join("?" * len(df.columns))
+        insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        
+        try:
+            for index, row in df.iterrows():
+                cursor.execute(insert_query, tuple(row))
+            self.connection.commit()
+            print(f"DataFrame saved to table {table_name} successfully")
+        except Exception as e:
+            print(f"Error saving DataFrame to SQL: {e}")
+    
+    def close(self):
+        if self.connection:
+            self.connection.close()
+            print("Connection closed")
+
+# Example usage
+if __name__ == "__main__":
+    server = 'your_server'
+    database = 'your_database'
+    username = 'your_username'
+    password = 'your_password'
+
+    db = SQLServerDatabase(server, database, username, password)
+    db.connect()
+
+    # Example JSON data
+    json_data = '''
+    [
+        {"column1": "value1", "column2": "value2", "column3": "value3"},
+        {"column1": "value4", "column2": "value5", "column3": "value6"}
+    ]
+    '''
+    df = db.json_to_dataframe(json_data)
+    if df is not None:
+        print(df)
+        # Save DataFrame to SQL table
+        db.dataframe_to_sql(df, table_name='your_table')
+
+    db.close()
